@@ -24,13 +24,12 @@ def get_daily_gift():
             locale="tr-TR"
         )
         
-        # Çerezleri güvenli bir şekilde ekleme ve domain düzeltme
+        # Çerezleri yükleme ve domain düzenleme
         if SUPERCELL_COOKIES:
             try:
                 cookies = json.loads(SUPERCELL_COOKIES)
                 formatted_cookies = []
                 for cookie in cookies:
-                    # Eksik veya hatalı alanları otomatik tamamlama
                     c = {
                         "name": cookie.get("name"),
                         "value": cookie.get("value"),
@@ -46,22 +45,19 @@ def get_daily_gift():
                     formatted_cookies.append(c)
                 
                 context.add_cookies(formatted_cookies)
-                print(f"Toplam {len(formatted_cookies)} adet çerez başarıyla yüklendi.")
+                print(f"Toplam {len(formatted_cookies)} adet çerez yüklendi.")
             except Exception as e:
                 print(f"Çerez işleme hatası: {e}")
 
         page = context.new_page()
         try:
             print("Supercell mağazasına bağlanılıyor...")
-            # Önce ana domaini açıp çerezleri oturtuyoruz
             page.goto("https://store.supercell.com", timeout=60000, wait_until="domcontentloaded")
             page.wait_for_timeout(2000)
             
-            # Şimdi Hay Day sayfasına geçiş yapıyoruz
             page.goto("https://store.supercell.com/tr/hayday", timeout=60000, wait_until="domcontentloaded")
-            page.wait_for_timeout(60000) # Oturumun yüklenmesi ve hediyenin gelmesi için uzun bekleme
+            page.wait_for_timeout(60000)
             
-            # Çerez onay penceresini kapat
             try:
                 cookie_btn = page.locator("button:has-text('Kabul'), button:has-text('Accept'), #onetrust-accept-btn-handler").first
                 if cookie_btn.is_visible():
@@ -70,7 +66,6 @@ def get_daily_gift():
             except Exception:
                 pass
 
-            # Hediyeyi bul
             claim_selectors = ["button:has-text('Al')", "button:has-text('Claim')", "text=Ücretsiz Günlük Hediye"]
             
             for selector in claim_selectors:
@@ -142,7 +137,6 @@ def main():
         "reply_markup": json.dumps(reply_markup)
     }
 
-Let's check code logic and complete response.
     if img_bytes:
         files = {"photo": ("gift.png", img_bytes, "image/png")}
         res = requests.post(telegram_url, data=payload_data, files=files)
