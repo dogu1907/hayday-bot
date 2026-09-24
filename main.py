@@ -7,7 +7,9 @@ from playwright.sync_api import sync_playwright
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 CHANNEL_ID = os.environ.get("CHANNEL_ID")
-SUPERCELL_COOKIES = os.environ.get("SUPERCELL_COOKIES")
+
+# Eğer Secret ile çalışmadıysa, kopyaladığınız çerezi buradaki tırnakların arasına yapıştırabilirsiniz:
+SUPERCELL_COOKIES = os.environ.get("[{"name":"OptanonConsent","value":"isGpcEnabled=0&datestamp=Thu+Sep+24+2026+17%3A00%3A56+GMT%2B0300+(T%C3%BCrkiye+Standart+Saati)&version=202401.2.0&browserGpcFlag=0&isIABGlobal=false&hosts=&genVendors=V5%3A0%2CV4%3A0%2CV1%3A0%2CV6%3A0%2CV2%3A0%2CV3%3A0%2CV7%3A0%2C&consentId=db37af2c-58ab-4933-8161-1d4d93fe3d0c&interactionCount=1&landingPath=NotLandingPage&groups=C0004%3A1%2CC0002%3A1%2CC0001%3A1&geolocation=TR%3B33&AwaitingReconsent=false","domain":".supercell.com","path":"/"},{"name":"NEXT_LOCALE","value":"tr","domain":".supercell.com","path":"/"},{"name":"_twpid","value":"tw.1790257924522.226167235157086065","domain":".supercell.com","path":"/"},{"name":"_twsid","value":"1790257924523-363991534.1.1790257993013","domain":".supercell.com","path":"/"},{"name":"ttcsid","value":"1790257924836::hwmt39GFo4P8gyED9rG1.1.1790257935668.0::1.-6366.0::0.0.0.0::3041.10.0","domain":".supercell.com","path":"/"},{"name":"ttcsid_D48QDBJC77U6M9K6QO00","value":"1790257924835::_45aVMVsQpd3OInIsA3R.1.1790257935680.1","domain":".supercell.com","path":"/"},{"name":"_sp_id.fbf6","value":"976b16fa-6dc8-4137-854d-1e8f793881ea.1790257886.1.1790257928..2be137cc-dd32-4583-becc-0f40de5871aa..bb6cef51-cdd8-46b7-bde3-ecffeea7349b.1790257886169.20","domain":".supercell.com","path":"/"},{"name":"_sp_ses.fbf6","value":"*","domain":".supercell.com","path":"/"},{"name":"_fbp","value":"fb.1.1790257924782.779728495771414952","domain":".supercell.com","path":"/"},{"name":"_ga","value":"GA1.1.1330084669.1790257925","domain":".supercell.com","path":"/"},{"name":"_ga_Q1VRW6YH7K","value":"GS2.1.s1790257924$o1$g0$t1790257924$j60$l0$h1944718567","domain":".supercell.com","path":"/"},{"name":"_scid","value":"LNjbVsnFkL-HgKlTB6pIKTbtl-6ps-zR","domain":".supercell.com","path":"/"},{"name":"_scid_r","value":"LNjbVsnFkL-HgKlTB6pIKTbtl-6ps-zR","domain":".supercell.com","path":"/"},{"name":"_tt_enable_cookie","value":"1","domain":".supercell.com","path":"/"},{"name":"_ttp","value":"01M39V02Q26DEJEWP2HD5XCYKA_.tt.1.1790257924834","domain":".supercell.com","path":"/"},{"name":"_gcl_au","value":"1.1.1317782378.1790257923","domain":".supercell.com","path":"/"},{"name":"scsso_scid","value":"34-bce10729-58af-4aae-8602-e8a2263cc56c","domain":".supercell.com","path":"/"},{"name":"OptanonAlertBoxClosed","value":"2026-09-24T13:51:26.151Z","domain":".supercell.com","path":"/"}] d8nr2j39xng9h8ppm9z4p7chm "") 
 
 KANAL_LINKI = "https://t.me/hdtest33" 
 
@@ -24,15 +26,20 @@ def get_daily_gift():
             locale="tr-TR"
         )
         
-        # Supercell ID oturumu için çerezler yükleniyor
-        if SUPERCELL_COOKIES:
+        # Çerezleri yükleme
+        cookies_to_use = SUPERCELL_COOKIES
+        if cookies_to_use:
             try:
-                cookies = json.loads(SUPERCELL_COOKIES)
+                if isinstance(cookies_to_use, str):
+                    cookies = json.loads(cookies_to_use)
+                else:
+                    cookies = cookies_to_use
+                    
                 for cookie in cookies:
                     if "sameSite" in cookie and cookie["sameSite"] not in ["Strict", "Lax", "None"]:
                         cookie["sameSite"] = "Lax"
                 context.add_cookies(cookies)
-                print("Supercell ID çerezleri yüklendi, oturum açılıyor...")
+                print("Supercell ID çerezleri başarıyla yüklendi!")
             except Exception as e:
                 print(f"Çerez yükleme hatası: {e}")
 
@@ -40,9 +47,9 @@ def get_daily_gift():
         try:
             print("Supercell mağazasına bağlanılıyor...")
             page.goto("https://store.supercell.com/tr/hayday", timeout=60000, wait_until="domcontentloaded")
-            page.wait_for_timeout(5000)  # Oturumun oturması için bekleme süresi artırıldı
+            page.wait_for_timeout(6000) # Oturumun tam oturması için bekleme süresi
             
-            # Çerez onay pencerelerini kapat
+            # Çerez onay penceresini kapat
             try:
                 cookie_btn = page.locator("button:has-text('Kabul'), button:has-text('Accept'), #onetrust-accept-btn-handler").first
                 if cookie_btn.is_visible():
@@ -51,16 +58,17 @@ def get_daily_gift():
             except Exception:
                 pass
 
-            # Ücretsiz hediye veya giriş yapılmış üst kartı bul
-            free_btn = page.locator("text=/Ücretsiz|ÜCRETSIZ|Free|Al/i").first
+            # Sayfada oturum açıldıysa görünen hediye kartını veya butonunu ara
+            # Giriş yapıldığında "Al" veya "Claim" butonu görünür
+            claim_btn = page.locator("button:has-text('Al'), button:has-text('Claim')").first
             
-            if free_btn.is_visible():
-                print("Hediyenin olduğu üst kart alanı bulundu!")
-                card = free_btn.locator("xpath=./ancestor::div[contains(@class, 'card') or contains(@class, 'offer') or contains(@class, 'Product') or @class][2]").first
+            if claim_btn.is_visible():
+                print("Giriş yapılmış durumda hediye/buton bulundu!")
+                card = claim_btn.locator("xpath=./ancestor::div[contains(@class, 'card') or contains(@class, 'offer') or contains(@class, 'Product') or @class][2]").first
                 card.scroll_into_view_if_needed()
                 page.wait_for_timeout(1500)
 
-                # Hediye adını temizle ve çek
+                # Hediye adını çek
                 card_text = card.inner_text()
                 lines = [line.strip() for line in card_text.split("\n") if line.strip()]
                 ignore_list = ["ücretsiz", "günlük", "hediye", "bekliyor", "sa", "dk", "bonus", "alınmayı", "al"]
@@ -70,10 +78,17 @@ def get_daily_gift():
                         break
 
                 img_bytes = card.screenshot()
-                print(f"Giriş yapılmış haldeki hediye görseli alındı! Hediye: {gift_name}")
+                print(f"Hediyenin resmi başarıyla alındı! Hediye: {gift_name}")
+                
+                # Hediyeyi otomatik hesaba al
+                try:
+                    claim_btn.click()
+                    print("Hediyeyi alma butonuna tıklandı!")
+                except Exception:
+                    pass
             else:
-                print("Kart bulunamadı, ekranın üst kısmı kırpılıyor...")
-                img_bytes = page.screenshot(clip={"x": 0, "y": 0, "width": 390, "height": 600})
+                print("Giriş butonu bulunamadı, ekranın üst kısmı alınıyor...")
+                img_bytes = page.screenshot(clip={"x": 0, "y": 0, "width": 390, "height": 650})
 
         except Exception as e:
             print(f"Hata oluştu: {e}")
