@@ -24,22 +24,42 @@ def get_daily_gift():
             locale="tr-TR"
         )
         
-        # Çerezleri yükleme
+        # Çerezleri güvenli bir şekilde ekleme ve domain düzeltme
         if SUPERCELL_COOKIES:
             try:
                 cookies = json.loads(SUPERCELL_COOKIES)
+                formatted_cookies = []
                 for cookie in cookies:
-                    if "sameSite" in cookie and cookie["sameSite"] not in ["Strict", "Lax", "None"]:
-                        cookie["sameSite"] = "Lax"
-                context.add_cookies(cookies)
+                    # Eksik veya hatalı alanları otomatik tamamlama
+                    c = {
+                        "name": cookie.get("name"),
+                        "value": cookie.get("value"),
+                        "domain": ".supercell.com",
+                        "path": "/",
+                    }
+                    if "secure" in cookie: c["secure"] = cookie["secure"]
+                    if "httpOnly" in cookie: c["httpOnly"] = cookie["httpOnly"]
+                    if "sameSite" in cookie and cookie["sameSite"] in ["Strict", "Lax", "None"]:
+                        c["sameSite"] = cookie["sameSite"]
+                    else:
+                        c["sameSite"] = "Lax"
+                    formatted_cookies.append(c)
+                
+                context.add_cookies(formatted_cookies)
+                print(f"Toplam {len(formatted_cookies)} adet çerez başarıyla yüklendi.")
             except Exception as e:
                 print(f"Çerez işleme hatası: {e}")
 
         page = context.new_page()
         try:
             print("Supercell mağazasına bağlanılıyor...")
+            # Önce ana domaini açıp çerezleri oturtuyoruz
+            page.goto("https://store.supercell.com", timeout=60000, wait_until="domcontentloaded")
+            page.wait_for_timeout(2000)
+            
+            # Şimdi Hay Day sayfasına geçiş yapıyoruz
             page.goto("https://store.supercell.com/tr/hayday", timeout=60000, wait_until="domcontentloaded")
-            page.wait_for_timeout(5000)
+            page.wait_for_timeout(60000) # Oturumun yüklenmesi ve hediyenin gelmesi için uzun bekleme
             
             # Çerez onay penceresini kapat
             try:
@@ -122,6 +142,7 @@ def main():
         "reply_markup": json.dumps(reply_markup)
     }
 
+Let's check code logic and complete response.
     if img_bytes:
         files = {"photo": ("gift.png", img_bytes, "image/png")}
         res = requests.post(telegram_url, data=payload_data, files=files)
