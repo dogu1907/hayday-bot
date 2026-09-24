@@ -8,7 +8,7 @@ from playwright.sync_api import sync_playwright
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 CHANNEL_ID = os.environ.get("CHANNEL_ID")
 
-# Kendi kanalınızın davet linkini buraya yazın
+# Kendi kanalınızın davet linkini yazın
 KANAL_LINKI = "https://t.me/hdtest33" 
 
 def get_daily_gift():
@@ -17,44 +17,62 @@ def get_daily_gift():
     
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        # Mobil görünüm taklidi yaparak hediyeyi daha kolay yakalıyoruz
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+            viewport={"width": 430, "height": 932},
+            locale="tr-TR"
+        )
+        page = context.new_page()
         try:
             print("Supercell mağazasına bağlanılıyor...")
             page.goto("https://store.supercell.com/tr/hayday", timeout=60000, wait_until="domcontentloaded")
             page.wait_for_timeout(4000)
             
-            # Çerez uyarısı varsa kapatmayı dene
+            # Çerez penceresini kapat
             try:
-                cookie_btn = page.locator("button:has-text('Kabul'), button:has-text('Accept')").first
+                cookie_btn = page.locator("button:has-text('Kabul'), button:has-text('Accept'), #onetrust-accept-btn-handler").first
                 if cookie_btn.is_visible():
                     cookie_btn.click()
                     page.wait_for_timeout(1000)
             except Exception:
                 pass
 
-            # Sayfayı görsellerin yüklenmesi için hafifçe kaydır
-            page.evaluate("window.scrollBy(0, 400)")
+            # Sayfayı kaydır ki görseller yüklensin
+            page.evaluate("window.scrollBy(0, 300)")
             page.wait_for_timeout(2000)
 
-            # "Ücretsiz" yazısını içeren kartı bul
-            free_element = page.locator("text='Ücretsiz'").first
-            if free_element.is_visible():
-                card = free_element.locator("xpath=./ancestor::div[contains(@class, 'product') or contains(@class, 'card') or contains(@class, 'item') or @class][1]").first
-                
+            # "Ücretsiz" yazısının olduğu hediye kartını ara
+            free_btn = page.locator("text='Ücretsiz'").first
+            if not free_btn.is_visible():
+                free_btn = page.locator("text='ÜCRETSIZ'").first
+
+            if free_btn.is_visible():
+                # Kartı bul ve odaklan
+                card = free_btn.locator("xpath=./ancestor::div[contains(@class, 'product') or contains(@class, 'card') or contains(@class, 'Item') or contains(@class, 'Offer') or @class][1]").first
+                card.scroll_into_view_if_needed()
+                page.wait_for_timeout(1500)
+
                 # Hediye ismini al
                 card_text = card.inner_text()
-                lines = [line.strip() for line in card_text.split("\n") if line.strip() and "Ücretsiz" not in line and "Al" not in line]
-                if lines:
-                    gift_name = lines[0]
+                lines = [line.strip() for line in card_text.split("\n") if line.strip()]
+                clean_lines = [l for l in lines if not any(kw in l.lower() for kw in ["ücretsiz", "al", "mağaza", "store", "0 tl", "claim"])]
+                if clean_lines:
+                    gift_name = clean_lines[0]
 
-                # Ekran görüntüsünü kart üzerinden yakala
-                img_elem = card.locator("img").first
-                if img_elem.is_visible():
-                    img_bytes = img_elem.screenshot()
-                else:
-                    img_bytes = card.screenshot()
+                # Doğrudan hediye kartının resmini/görüntüsünü al
+                img_bytes = card.screenshot()
+                print("Hediye kartının görüntüsü başarıyla alındı!")
+            else:
+                print("Ücretsiz etiketi bulunamadı, genel sayfa görüntüsü alınıyor...")
+                img_bytes = page.screenshot()
+
         except Exception as e:
-            print(f"Playwright tarama uyarısı: {e}")
+            print(f"Hata oluştu: {e}")
+            try:
+                img_bytes = page.screenshot()
+            except Exception:
+                pass
         finally:
             browser.close()
             
@@ -69,10 +87,8 @@ def main():
     date_str = now_tr.strftime("%d.%m.%Y")
     
     gift_name, img_bytes = get_daily_gift()
-    
-    # HTML hata vermesin diye özel karakterleri temizle
     safe_gift_name = html.escape(gift_name)
-    print(f"Çekilen Hediye: {gift_name}")
+    print(f"Çekilen Hediye Adı: {gift_name}")
 
     caption = f"""🎁 <b>{safe_gift_name}</b>
 
@@ -102,26 +118,11 @@ def main():
     }
 
     if img_bytes:
-        print("Görsel Telegram'a dosyayla yükleniyor...")
         files = {"photo": ("gift.png", img_bytes, "image/png")}
         res = requests.post(telegram_url, data=payload_data, files=files)
+        print(f"Telegram Yanıtı: {res.text}")
     else:
-        print("Görsel yakalanamadı, varsayılan görsel kullanılıyor...")
-        payload_data["photo"] = "https://play-lh.googleusercontent.com/tG_A01qT3-w4_Vmsq02E40d-HnK1Hn_eTcl_mKhyLzV3q_V0m-B6fRifb5H9QZt5L6s"
-        res = requests.post(telegram_url, data=payload_data)
-
-    print(f"Telegram Yanıtı: {res.text}")
-
-    if res.status_code != 200:
-        print("Fotoğraf gönderiminde sorun oluştu, metin olarak gönderiliyor...")
-        msg_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        msg_payload = {
-            "chat_id": CHANNEL_ID,
-            "text": caption,
-            "parse_mode": "HTML",
-            "reply_markup": reply_markup
-        }
-        requests.post(msg_url, json=msg_payload)
+        print("Görsel oluşturulamadı!")
 
 if __name__ == "__main__":
     main()
