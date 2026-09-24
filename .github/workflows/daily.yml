@@ -3,7 +3,7 @@ name: Hay Day Gift Bot Daily
 on:
   schedule:
     - cron: '0 8 * * *'  # Her gün Türkiye saatiyle 11:00 (UTC 08:00)
-  workflow_dispatch:      # Elle manuel çalıştırma butonu ekler
+  workflow_dispatch:      # Elle manuel çalıştırma
 
 jobs:
   run-bot:
@@ -20,7 +20,7 @@ jobs:
       - name: Kütüphaneleri ve Tarayıcıyı Yükle
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install requests playwright
           playwright install chromium --with-deps
 
       - name: Botu Çalıştır
